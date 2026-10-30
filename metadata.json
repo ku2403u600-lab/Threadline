@@ -1,0 +1,10 @@
+{
+  "name": "Remix THREADLINE",
+  "description": "India-first conversational fashion-sourcing assistant for independent designers, emerging labels, boutiques, and fashion students.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
