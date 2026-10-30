@@ -432,11 +432,21 @@ app.post('/api/speak', async (req: Request, res: Response) => {
       .replace(/`([^`]+)`/g, '$1')
       .trim();
 
+    const voiceStyles: Record<string, string> = {
+      Kore: 'Clear, warm, natural female Indian fashion sourcing specialist',
+      Zephyr: 'Calm, crisp, articulate female fashion styling consultant',
+      Puck: 'Clear, friendly, engaging male textile production advisor',
+      Fenrir: 'Deep, authoritative, calm male textile mill veteran',
+      Charon: 'Confident, steady, articulate male sourcing consultant',
+    };
+    const style = voiceStyles[voiceName] || 'Clear, warm, natural Indian fashion sourcing specialist';
+
     if (!ai || !process.env.GEMINI_API_KEY) {
       res.json({
         audioData: null,
         fallbackToBrowser: true,
         cleanText: cleanSpeechText,
+        voiceName: voiceName || 'Kore',
       });
       return;
     }
@@ -451,7 +461,7 @@ app.post('/api/speak', async (req: Request, res: Response) => {
             {
               text: cleanSpeechText,
               speechMetadata: {
-                style: 'Clear, warm, professional Indian fashion sourcing specialist',
+                style,
               },
             },
           ],
@@ -477,11 +487,15 @@ app.post('/api/speak', async (req: Request, res: Response) => {
       audioData: audioBase64,
       mimeType: 'audio/wav',
       cleanText: cleanSpeechText,
+      voiceName: voiceName || 'Kore',
     });
   } catch (err: any) {
-    console.warn('TTS generation failed:', err.message || err);
-    res.status(500).json({
-      error: err.message || 'Text-to-speech generation failed.',
+    console.warn('TTS generation failed, instructing client to use browser voice fallback:', err.message || err);
+    res.json({
+      audioData: null,
+      fallbackToBrowser: true,
+      cleanText: req.body?.text || '',
+      voiceName: req.body?.voiceName || 'Kore',
     });
   }
 });

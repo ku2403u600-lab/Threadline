@@ -144,3 +144,17 @@ export interface TestScenario {
   testerNotes?: string;
   testedAt?: string;
 }
+
+export type VoiceGender = 'female' | 'male';
+
+export interface VoiceOption {
+  id: string; // 'Kore' | 'Zephyr' | 'Puck' | 'Fenrir' | 'Charon'
+  name: string;
+  gender: VoiceGender;
+  personaLabel: string;
+  description: string;
+  speechStyleDescription: string;
+  pitch: number;
+  rate: number;
+}
+

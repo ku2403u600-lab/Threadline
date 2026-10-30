@@ -18,7 +18,7 @@ import { DevTestPanel } from './components/DevTestPanel';
 import { VoiceController } from './components/VoiceController';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { MaterialCalculator } from './components/MaterialCalculator';
-import { speechService } from './utils/speechService';
+import { speechService, VOICE_OPTIONS } from './utils/speechService';
 import {
   Send,
   Paperclip,
@@ -84,6 +84,11 @@ export default function App() {
   const [autoSpeakVoice, setAutoSpeakVoice] = useState<boolean>(true);
   const [speechState, setSpeechState] = useState<'idle' | 'loading' | 'playing' | 'error'>('idle');
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(
+    speechService.getState().voiceId || 'Kore'
+  );
+
+  const currentVoice = speechService.getVoice(selectedVoiceId);
 
   // Calculator & Yardage filter state
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -124,14 +129,18 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Subscribe to speech service states
+  // Subscribe to speech service states and voice changes
   useEffect(() => {
     const unsubscribe = speechService.addListener((state, activeId) => {
       setSpeechState(state);
       setActiveSpeakingId(activeId || null);
     });
+    const unsubVoice = speechService.addVoiceListener((v) => {
+      setSelectedVoiceId(v.id);
+    });
     return () => {
       unsubscribe();
+      unsubVoice();
       speechService.stop();
     };
   }, []);
@@ -260,7 +269,7 @@ export default function App() {
 
       // Voice-to-Voice: If auto-speak is enabled or this turn was voice triggered, speak the response!
       if (autoSpeakVoice || isVoicePrompt) {
-        speechService.speak(assistantMessage.content, assistantMessage.id);
+        speechService.speak(assistantMessage.content, assistantMessage.id, selectedVoiceId);
       }
     } catch (err: any) {
       console.error('Chat error:', err);
@@ -628,18 +637,25 @@ export default function App() {
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => speechService.speak(msg.content, msg.id)}
+                                  onClick={() => speechService.speak(msg.content, msg.id, selectedVoiceId)}
                                   className="px-2.5 py-1 text-xs font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors flex items-center gap-1.5"
-                                  title="Listen to this response aloud"
+                                  title={`Listen to this response aloud with ${currentVoice.name} (${currentVoice.gender})`}
                                 >
                                   <Volume2 className="w-3.5 h-3.5 text-stone-700" />
                                   <span>Speak Response</span>
                                 </button>
                               )}
                             </div>
-                            <span className="text-[11px] text-stone-500 hidden sm:inline">
-                              Gemini Voice
-                            </span>
+                            <div className="flex items-center gap-1.5 text-[11px] text-stone-500 hidden sm:flex">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  currentVoice.gender === 'female' ? 'bg-purple-500' : 'bg-blue-500'
+                                }`}
+                              />
+                              <span>
+                                {currentVoice.name} ({currentVoice.gender})
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -799,6 +815,37 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* Quick Voice Selector (Female & Male Natural Voices) */}
+                  <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 hover:border-stone-300 rounded-lg px-2 py-1 text-xs transition-colors">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        currentVoice.gender === 'female' ? 'bg-purple-500' : 'bg-blue-500'
+                      }`}
+                      title={`${currentVoice.name} (${currentVoice.gender})`}
+                    />
+                    <select
+                      value={selectedVoiceId}
+                      onChange={(e) => {
+                        const vId = e.target.value;
+                        speechService.setVoice(vId);
+                        setSelectedVoiceId(vId);
+                      }}
+                      className="bg-transparent text-xs font-medium text-stone-800 focus:outline-hidden cursor-pointer"
+                      title="Select agent voice persona (female & male natural voices)"
+                      aria-label="Select voice assistant persona"
+                    >
+                      <optgroup label="Female Voices">
+                        <option value="Kore">Kore (Female · Warm & Natural)</option>
+                        <option value="Zephyr">Zephyr (Female · Crisp & Articulate)</option>
+                      </optgroup>
+                      <optgroup label="Male Voices">
+                        <option value="Puck">Puck (Male · Friendly & Engaging)</option>
+                        <option value="Fenrir">Fenrir (Male · Deep & Authoritative)</option>
+                        <option value="Charon">Charon (Male · Steady & Confident)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
                   {/* Voice-to-Voice auto-speak toggle */}
                   <button
                     type="button"
@@ -965,6 +1012,13 @@ export default function App() {
         preferences={preferences}
         onUpdatePreferences={setPreferences}
         onResetSession={handleNewSession}
+        selectedVoiceId={selectedVoiceId}
+        onSelectVoice={(vId) => {
+          speechService.setVoice(vId);
+          setSelectedVoiceId(vId);
+        }}
+        autoSpeakVoice={autoSpeakVoice}
+        onToggleAutoSpeak={setAutoSpeakVoice}
       />
 
       {/* Pop-up Modal: Material Yardage & Cost Calculator */}
@@ -993,7 +1047,9 @@ export default function App() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
             </span>
-            <span className="font-semibold text-stone-100">THREADLINE Speaking</span>
+            <span className="font-semibold text-stone-100">
+              {currentVoice.name} ({currentVoice.gender}) Speaking
+            </span>
           </div>
 
           <div className="flex items-center gap-0.5 h-4 px-1">
